@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Web;
 using System.Xml;
 using Newtonsoft.Json;
+using System.Buffers.Text;
 
 
 namespace StoreLib.Services
@@ -62,7 +63,7 @@ namespace StoreLib.Services
             {
                 if(node.Attributes.Count >= 3)
                 {
-                    PackageInstance package = new PackageInstance(node.Attributes.GetNamedItem("PackageMoniker").Value, new Uri("http://test.com"), Utilities.TypeHelpers.StringToPackageType(node.Attributes.GetNamedItem("PackageType").Value), JsonConvert.DeserializeObject<ApplicabilityBlob>(node.FirstChild.InnerText), "");
+                    PackageInstance package = new PackageInstance(node.Attributes.GetNamedItem("PackageMoniker").Value, new PackageFileInfo(), Utilities.TypeHelpers.StringToPackageType(node.Attributes.GetNamedItem("PackageType").Value), JsonConvert.DeserializeObject<ApplicabilityBlob>(node.FirstChild.InnerText), "");
                     PackageInstances.Add(package);
                 }
             }
@@ -119,10 +120,10 @@ namespace StoreLib.Services
         /// <param name="RevisionIDs"></param>
         /// <param name="MSAToken"></param>
         /// <returns>IList of App Package Download Uris</returns>
-        public static async Task<IList<Uri>> GetFileUrlsAsync(IList<string> UpdateIDs, IList<string> RevisionIDs, string MSAToken)
+        public static async Task<IList<PackageFileInfo>> GetFileUrlsAsync(IList<string> UpdateIDs, IList<string> RevisionIDs, string MSAToken)
         {
             XmlDocument doc = new XmlDocument();
-            IList<Uri> uris = new List<Uri>();
+            IList<PackageFileInfo> uris = new List<PackageFileInfo>();
             foreach (string ID in UpdateIDs)
             {
                 HttpContent httpContent = new StringContent(String.Format(GetResourceTextFile("FE3FileUrl.xml"), ID, RevisionIDs[UpdateIDs.IndexOf(ID)], MSAToken ?? _msaToken), Encoding.UTF8, "application/soap+xml");//Loading the request xml from a file to keep things nice and tidy.
@@ -130,31 +131,41 @@ namespace StoreLib.Services
                 httpRequest.RequestUri = Endpoints.FE3DeliverySecured;
                 httpRequest.Content = httpContent;
                 httpRequest.Method = HttpMethod.Post;
-                HttpResponseMessage httpResponse = await _httpClient.SendAsync(httpRequest, new System.Threading.CancellationToken()); 
-                doc.LoadXml(await httpResponse.Content.ReadAsStringAsync());
+                HttpResponseMessage httpResponse = await _httpClient.SendAsync(httpRequest, new System.Threading.CancellationToken());
+                string content = await httpResponse.Content.ReadAsStringAsync();
+                doc.LoadXml(content);
                 XmlNodeList XmlUrls = doc.GetElementsByTagName("FileLocation");
                 bool foundUrl = false;
                 foreach (XmlNode node in XmlUrls)
                 {
-                    foreach (XmlNode child in node.ChildNodes)
+					PackageFileInfo fileInfo = new PackageFileInfo();
+					foreach (XmlNode child in node.ChildNodes)
                     {
                         if (child.Name == "Url")
                         {
                             if (child.InnerText.Length != 99)//We need to make sure we grab the package url and not the blockmap. The blockmap will always be 99 in length. A cheap hack but it works. 
                             {
-                                uris.Add(new Uri(child.InnerText));
+								fileInfo.Uri = new Uri(child.InnerText);
                                 foundUrl = true;
-                                break;
                             }
                         }
+                        else if (child.Name == "FileDigest")
+                        {
+                            // Convert the hash to a normal hex based representation
+							fileInfo.Hash = BitConverter.ToString(Convert.FromBase64String(child.InnerText)).Replace("-", "").ToLowerInvariant();
+						}
                     }
 
-                    if (foundUrl) break;
+                    if (foundUrl)
+                    {
+						uris.Add(fileInfo);
+						break;
+                    }
                 }
 
                 if (!foundUrl)
                 {
-                    uris.Add(new Uri("http://test.com"));
+                    uris.Add(new PackageFileInfo());
                 }
             }
             return uris;

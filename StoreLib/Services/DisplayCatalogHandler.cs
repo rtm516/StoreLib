@@ -51,11 +51,11 @@ namespace StoreLib.Services
             IList<string> UpdateIDs;
             FE3Handler.ProcessUpdateIDs(xml, out RevisionIDs, out PackageNames, out UpdateIDs);
             IList<PackageInstance> PackageInstances = await FE3Handler.GetPackageInstancesAsync(xml);
-            IList<Uri> Files = await FE3Handler.GetFileUrlsAsync(UpdateIDs, RevisionIDs, MSAToken);
+            IList<PackageFileInfo> Files = await FE3Handler.GetFileUrlsAsync(UpdateIDs, RevisionIDs, MSAToken);
             foreach(PackageInstance package in PackageInstances)
             {
                 int id = PackageInstances.IndexOf(package);
-                package.PackageUri = Files[id];
+                package.PackageFile = Files[id];
                 package.UpdateId = UpdateIDs[id];
             }
             return PackageInstances;

@@ -7,20 +7,21 @@ namespace StoreLib.Models
     public class PackageInstance
     {
         public string PackageMoniker;
-        public Uri PackageUri;
+        public PackageFileInfo PackageFile;
+        public string PackageHash;
         public PackageType PackageType;
         public ApplicabilityBlob ApplicabilityBlob;
         public String UpdateId;
 
-        public PackageInstance(string PackageMoniker, Uri PackageUri, PackageType PackageType, ApplicabilityBlob ApplicabilityBlob, String UpdateId)
+        public PackageInstance(string PackageMoniker, PackageFileInfo PackageFile, PackageType PackageType, ApplicabilityBlob ApplicabilityBlob, String UpdateId)
         {
             this.PackageMoniker = PackageMoniker;
-            this.PackageUri = PackageUri;
+            this.PackageFile = PackageFile;
             this.PackageType = PackageType;
             this.ApplicabilityBlob = ApplicabilityBlob;
             this.UpdateId = UpdateId;
         }
-    }
+	}
 
     // Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse); 
     public class ContentTargetPlatform
@@ -99,5 +100,11 @@ namespace StoreLib.Models
 
         [JsonProperty("policy2")]
         public Policy2 Policy2 { get; set; }
+    }
+
+    public class PackageFileInfo
+    {
+        public Uri Uri { get; set; }
+        public string Hash { get; set; }
     }
 }
